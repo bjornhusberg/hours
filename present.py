@@ -1,6 +1,4 @@
-import sys
-import re
-import os
+import sys, re, os, operator
 
 if len(sys.argv) < 2:
     print("Usage: " + sys.argv[0] + " <file> <columns>")
@@ -11,11 +9,12 @@ def print_row(text, time, label_size):
 
 def print_summary(filename):
     break_limit = 1200
+    idle_limit = 40
 
     activity = {}
 
     group_start = None
-    current_start = None
+    last_time = None
 
     lines = [line.rstrip('\n') for line in open(filename)]
     total = 0
@@ -33,21 +32,31 @@ def print_summary(filename):
         time = 3600 * int(match.group(1)) + 60 * int(match.group(2)) + int(match.group(3))
         application = match.group(4)
 
-        if group_start:
-            if time - current_start > break_limit or line == lines[-1]:
-                groups.append([group_start, current_start])
-                total = total + current_start - group_start
-                group_start = time
-            else:
-                if application not in activity:
-                    activity[application] = 0
-                activity[application] = activity[application] + time - current_start
-        else:
-            group_start = time
+        if not group_start:
+            group_start = last_time = time
+            continue
 
-        current_start = time
+        if time - last_time > idle_limit:
+            application = "idle"
+
+        if application == "idle":
+            continue
+
+        if (time - last_time > break_limit or line == lines[-1]):
+            groups.append([group_start, last_time])
+            total = total + last_time - group_start
+            group_start = last_time = time
+            continue
+
+        if application not in activity:
+            activity[application] = 0
+
+        activity[application] = activity[application] + time - last_time
+
+        last_time = time
 
     label_size = len(max(activity, key=len))
+    sorted_apps = sorted(activity, key=activity.get, reverse=True)
 
     for group in groups:
         print_row("Start", group[0], label_size)
@@ -55,8 +64,8 @@ def print_summary(filename):
         print_row("Time", group[1] - group[0], label_size)
         print()
 
-    for app_activity in activity:
-        print_row(app_activity, activity[app_activity], label_size)
+    for app in sorted_apps:
+        print_row(app, activity[app], label_size)
 
     print()
     print_row("Total", total, label_size)
