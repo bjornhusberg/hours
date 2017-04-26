@@ -39,9 +39,6 @@ def print_summary(filename):
         if time - last_time > idle_limit:
             application = "idle"
 
-        if application == "idle":
-            continue
-
         if (time - last_time > break_limit or line == lines[-1]):
             groups.append([group_start, last_time])
             total = total + last_time - group_start
